@@ -18,6 +18,19 @@ from gear_sonic.data.robot_model.robot_model import RobotModel
 ArgsConfig = SimLoopConfig
 
 
+def resolve_scene(scene: str) -> str:
+    """Accept a repo-relative MJCF path or an investigation scene name (e.g. 'hurdle_10cm')."""
+    if scene.endswith(".xml"):
+        return scene
+    from gear_sonic.investigation.decoder_expressivity.common import REPO_ROOT
+    from gear_sonic.investigation.decoder_expressivity.make_scenes import scene_path
+
+    path = scene_path(scene)
+    if not path.exists():
+        raise FileNotFoundError(f"Scene '{scene}' not found at {path}; run make_scenes.py")
+    return str(path.relative_to(REPO_ROOT))
+
+
 class SimWrapper:
     def __init__(self, robot_model: RobotModel, env_name: str, config: Dict[str, any], **kwargs):
         self.robot_model = robot_model
@@ -37,6 +50,11 @@ def main(config: ArgsConfig):
     wbc_config = config.load_wbc_yaml()
     # NOTE: we will override the interface to local if it is not specified
     wbc_config["ENV_NAME"] = config.env_name
+    if config.robot_scene:
+        wbc_config["ROBOT_SCENE"] = resolve_scene(config.robot_scene)
+    if config.eval_log_dir:
+        wbc_config["EVAL_LOG_DIR"] = config.eval_log_dir
+    wbc_config["FALL_RESET"] = config.fall_reset
 
     if config.enable_image_publish:
         assert (

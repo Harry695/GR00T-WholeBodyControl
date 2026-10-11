@@ -63,6 +63,7 @@ class DefaultEnv:
 
         self.init_scene()
         self.last_reward = 0
+        self.init_eval_recorder()
 
         self.offscreen = offscreen
         if self.offscreen:
@@ -247,6 +248,60 @@ class DefaultEnv:
         self.left_hand_index = np.array(self.left_hand_index)
         self.right_hand_index = np.array(self.right_hand_index)
 
+    def init_eval_recorder(self):
+        """Opt-in per-tick physical-state logger (root pose, contacts, falls) for evaluation runs.
+
+        Enabled by setting ``EVAL_LOG_DIR`` in the config; see
+        gear_sonic/investigation/decoder_expressivity/metrics.py.
+        """
+        self.eval_recorder = None
+        self.eval_log_dir = self.config.get("EVAL_LOG_DIR")
+        if not self.eval_log_dir:
+            return
+        from gear_sonic.investigation.decoder_expressivity.metrics import EvalRecorder
+
+        self.eval_recorder = EvalRecorder(
+            self.mj_model,
+            self.mj_data,
+            body_qpos_adr=self.body_joint_index + self.qpos_offset - 1,
+            body_dof_adr=self.body_joint_index + self.qvel_offset - 1,
+        )
+        self._eval_every = max(1, int(round(0.02 / self.sim_dt)))  # record at 50 Hz
+        self._eval_save_every = int(round(15.0 / self.sim_dt))
+        self._eval_step_cnt = 0
+        self._eval_band_prev = None
+        print(f"[eval] logging sim state to {self.eval_log_dir}")
+
+    def eval_record_step(self):
+        self._eval_step_cnt += 1
+        if self._eval_step_cnt % self._eval_every:
+            return
+        band = getattr(self, "elastic_band", None)
+        band_on = bool(band.enable) if band is not None else False
+        if band_on != self._eval_band_prev and self._eval_band_prev is not None:
+            self.eval_recorder.add_event(
+                self.mj_data.time, "band_engaged" if band_on else "band_released"
+            )
+        self._eval_band_prev = band_on
+        idx = self.body_joint_index - 1
+        self.eval_recorder.record(
+            self.mj_data.time,
+            tau=self.torques[idx],
+            tau_limit=self.torque_limit[idx],
+            band_enabled=band_on,
+        )
+        if self._eval_step_cnt % self._eval_save_every == 0:
+            self.save_eval()
+
+    def save_eval(self):
+        if getattr(self, "eval_recorder", None) is None:
+            return
+        try:
+            summary = self.eval_recorder.save(self.eval_log_dir, extra_summary={"scene": self.config["ROBOT_SCENE"]})
+            return summary
+        except Exception as e:
+            print(f"[eval] failed to save eval log: {e}")
+
     def init_renderers(self):
         self.renderers = {}
         for camera_name, camera_config in self.camera_configs.items():
@@ -429,6 +484,9 @@ class DefaultEnv:
             self.mj_data.ctrl = self.torques
         mujoco.mj_step(self.mj_model, self.mj_data)
 
+        if self.eval_recorder is not None:
+            self.eval_record_step()
+
         self.check_fall()
 
     def apply_perturbation(self, key):
@@ -506,13 +564,21 @@ class DefaultEnv:
             self.apply_perturbation(key)
 
     def check_fall(self):
+        was_fallen = getattr(self, "fall", False)
         self.fall = False
         if self.mj_data.qpos[2] < 0.2:
             self.fall = True
-            print(f"Warning: Robot has fallen, height: {self.mj_data.qpos[2]:.3f} m")
+            if not was_fallen:
+                print(f"Warning: Robot has fallen, height: {self.mj_data.qpos[2]:.3f} m")
 
         if self.fall:
-            self.reset()
+            if not was_fallen and getattr(self, "eval_recorder", None) is not None:
+                self.eval_recorder.add_event(
+                    self.mj_data.time, "fall", pelvis_z=float(self.mj_data.qpos[2])
+                )
+            if self.config.get("FALL_RESET", True):
+                self.reset()
+                self.fall = False
 
     def check_self_collision(self):
         robot_bodies = get_subtree_body_names(self.mj_model, self.mj_model.body(self.root_body).id)
@@ -644,6 +710,7 @@ class BaseSimulator:
 
     def close(self):
         self._running = False
+        self.sim_env.save_eval()
         try:
             if self.sim_env.image_publish_process is not None:
                 self.sim_env.image_publish_process.stop()

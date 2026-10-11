@@ -1,0 +1,247 @@
+# Part 1: planner-command scenarios (SONIC's built-in high-level interface).
+#
+# The robot spawns at the origin facing +x; obstacles (make_scenes.py) are ahead along +x.
+# Directions are in the planner's world frame (heading is re-initialised to the robot's
+# heading at start, i.e. +x). Each step is held for `dur` seconds; planner messages are sent
+# at 20 Hz.
+#
+#   mode   : LocomotionMode name (localmotion_kplanner.hpp)
+#   move   : movement direction (normalised by the deploy)        default [0,0,0]
+#   face   : facing direction                                       default [1,0,0]
+#   speed  : m/s, -1 = mode default.  Trained ranges (keyboard clamps):
+#            SLOW_WALK 0.2-0.8, CRAWLING 0.4-1.0, ELBOW_CRAWLING 0.7-1.0, RUN 1.5-3.0
+#   height : pelvis height in m, -1 = mode default. ONLY honoured by squat-family modes
+#            (IDEL_SQUAT, IDEL_KNEEL*, IDEL_LYING_FACE_DOWN, CRAWLING, ELBOW_CRAWLING), 0.2-0.8.
+#            Walking modes ignore it -> there is no "crouch while walking at height h" knob.
+#
+# `scene` is the default scene; run_part1.sh can override it (e.g. hurdle_5cm .. hurdle_20cm).
+
+scenarios:
+
+  # ------------------------------------------------------------------ step over -------
+  step_slowwalk_02:
+    scene: hurdle_10cm
+    description: Slow walk (0.2 m/s) straight at a hurdle 1 m ahead.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 10, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.2}
+      - {dur: 3, mode: IDLE}
+
+  step_slowwalk_05:
+    scene: hurdle_10cm
+    description: Slow walk (0.5 m/s) straight at a hurdle.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 6, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.5}
+      - {dur: 3, mode: IDLE}
+
+  step_walk:
+    scene: hurdle_10cm
+    description: Normal WALK (mode default speed) at a hurdle.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: WALK, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  step_stealth:
+    scene: hurdle_10cm
+    description: STEALTH_WALK (exaggerated, careful steps) at a hurdle.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 10, mode: STEALTH_WALK, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  step_ledge:
+    scene: hurdle_10cm
+    description: LEDGE_WALKING (cautious stepping style) at a hurdle.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 10, mode: LEDGE_WALKING, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  step_jump:
+    scene: hurdle_10cm
+    description: Approach slowly, then FORWARD_JUMP just before the hurdle (x ~ 0.6 m).
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 2.5, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.2}
+      - {dur: 2, mode: FORWARD_JUMP, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  # ------------------------------------------------------------- narrow gap -------------
+  gap_frontal:
+    scene: gap_40cm
+    description: Walk straight (facing +x) through the opening at slow speed.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 10, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.2}
+      - {dur: 3, mode: IDLE}
+
+  gap_sideways_slowwalk:
+    scene: gap_32cm
+    description: Turn to face +y, then side-step along +x through the opening (shimmy).
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDLE, face: [0, 1, 0]}
+      - {dur: 12, mode: SLOW_WALK, move: [1, 0, 0], face: [0, 1, 0], speed: 0.2}
+      - {dur: 3, mode: IDLE, face: [0, 1, 0]}
+
+  gap_sideways_stealth:
+    scene: gap_32cm
+    description: Same shimmy with STEALTH_WALK.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDLE, face: [0, 1, 0]}
+      - {dur: 12, mode: STEALTH_WALK, move: [1, 0, 0], face: [0, 1, 0]}
+      - {dur: 3, mode: IDLE, face: [0, 1, 0]}
+
+  gap_sideways_ledge:
+    scene: gap_32cm
+    description: Same shimmy with LEDGE_WALKING (trained on sidestepping along a ledge).
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDLE, face: [0, 1, 0]}
+      - {dur: 12, mode: LEDGE_WALKING, move: [1, 0, 0], face: [0, 1, 0]}
+      - {dur: 3, mode: IDLE, face: [0, 1, 0]}
+
+  # ----------------------------------------------------------- duck under bar ------------
+  duck_stealth:
+    scene: lowbar_100cm
+    description: STEALTH_WALK under a bar (stealth posture is lower than normal walking).
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 10, mode: STEALTH_WALK, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  duck_stealth2:
+    scene: lowbar_100cm
+    description: STEALTH_WALK_2 under a bar.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 10, mode: STEALTH_WALK_2, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  duck_crawl_h06:
+    scene: lowbar_85cm
+    description: Squat down to 0.6 m, then CRAWLING (height 0.6) under the bar, then stand.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDEL_SQUAT, height: 0.6}
+      - {dur: 8, mode: CRAWLING, move: [1, 0, 0], speed: 0.4, height: 0.6}
+      - {dur: 3, mode: IDEL_SQUAT, height: 0.6}
+      - {dur: 3, mode: IDLE}
+
+  duck_crawl_h04:
+    scene: lowbar_70cm
+    description: Squat to 0.4 m, CRAWLING (height 0.4) under a low bar.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDEL_SQUAT, height: 0.4}
+      - {dur: 8, mode: CRAWLING, move: [1, 0, 0], speed: 0.4, height: 0.4}
+      - {dur: 3, mode: IDEL_SQUAT, height: 0.4}
+      - {dur: 3, mode: IDLE}
+
+  duck_elbow_crawl:
+    scene: lowbar_55cm
+    description: Go prone and ELBOW_CRAWL under a very low bar.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDEL_KNEEL_TWO_LEGS, height: 0.4}
+      - {dur: 3, mode: IDEL_LYING_FACE_DOWN, height: 0.3}
+      - {dur: 8, mode: ELBOW_CRAWLING, move: [1, 0, 0], speed: 0.7, height: 0.3}
+      - {dur: 3, mode: IDEL_KNEEL_TWO_LEGS, height: 0.4}
+      - {dur: 4, mode: IDLE}
+
+  # ------------------------------------------------------------- floor clutter -----------
+  clutter_slow_straight:
+    scene: clutter_sparse
+    description: Slow walk (0.2 m/s) straight through clutter, no steering.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 14, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.2}
+      - {dur: 3, mode: IDLE}
+
+  clutter_slow_zigzag:
+    scene: clutter_sparse
+    description: Slow steps that change direction every 1.5 s while keeping facing +x.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, 0.6, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, -0.6, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [0, 1, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, -1, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [0, -1, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, 0.3, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, 0.6, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.2}
+      - {dur: 1.5, mode: SLOW_WALK, move: [1, -0.6, 0], speed: 0.2}
+      - {dur: 3, mode: IDLE}
+
+  clutter_slow_steer:
+    scene: clutter_dense
+    description: Like zigzag but the robot also turns to face its direction of travel.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 2, mode: SLOW_WALK, move: [1, 0.6, 0], face: [1, 0.6, 0], speed: 0.2}
+      - {dur: 2, mode: SLOW_WALK, move: [1, -0.6, 0], face: [1, -0.6, 0], speed: 0.2}
+      - {dur: 2, mode: SLOW_WALK, move: [1, 0, 0], face: [1, 0, 0], speed: 0.2}
+      - {dur: 2, mode: SLOW_WALK, move: [1, 0.8, 0], face: [1, 0.8, 0], speed: 0.2}
+      - {dur: 2, mode: SLOW_WALK, move: [1, -0.8, 0], face: [1, -0.8, 0], speed: 0.2}
+      - {dur: 2, mode: SLOW_WALK, move: [1, 0, 0], face: [1, 0, 0], speed: 0.2}
+      - {dur: 3, mode: IDLE}
+
+  clutter_ledge:
+    scene: clutter_dense
+    description: LEDGE_WALKING (careful foot placement style) through dense clutter.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 14, mode: LEDGE_WALKING, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}
+
+  # ---------------------------------------------------------- vocabulary tour ------------
+  vocab_tour:
+    scene: flat
+    description: >
+      Every planner mode for 4 s (moving modes go forward), returning to IDLE in between.
+      Characterises the command vocabulary and fills the token library with planner tokens.
+    steps:
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: SLOW_WALK, move: [1, 0, 0], speed: 0.3}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: WALK, move: [-1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: STEALTH_WALK, move: [1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: STEALTH_WALK_2, move: [-1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: INJURED_WALK, move: [1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: LEDGE_WALKING, move: [-1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: OBJECT_CARRYING, move: [1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: HAPPY_DANCE_WALK, move: [-1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: ZOMBIE_WALK, move: [1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: GUN_WALK, move: [-1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: SCARE_WALK, move: [1, 0, 0]}
+      - {dur: 2, mode: IDLE}
+      - {dur: 4, mode: WALK_BOXING, move: [-1, 0, 0], speed: 0.7}
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDEL_BOXING}
+      - {dur: 3, mode: RANDOM_PUNCH, speed: 0.7}
+      - {dur: 2, mode: IDLE}
+      - {dur: 3, mode: IDEL_SQUAT, height: 0.6}
+      - {dur: 3, mode: IDEL_SQUAT, height: 0.4}
+      - {dur: 3, mode: IDEL_KNEEL, height: 0.4}
+      - {dur: 3, mode: IDEL_KNEEL_TWO_LEGS, height: 0.4}
+      - {dur: 4, mode: CRAWLING, move: [1, 0, 0], speed: 0.4, height: 0.5}
+      - {dur: 3, mode: IDEL_LYING_FACE_DOWN, height: 0.3}
+      - {dur: 4, mode: ELBOW_CRAWLING, move: [-1, 0, 0], speed: 0.7, height: 0.3}
+      - {dur: 3, mode: IDEL_KNEEL_TWO_LEGS, height: 0.4}
+      - {dur: 4, mode: IDLE}
+      - {dur: 2, mode: FORWARD_JUMP, move: [1, 0, 0]}
+      - {dur: 3, mode: IDLE}

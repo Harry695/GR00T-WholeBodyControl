@@ -344,3 +344,13 @@ class SimLoopConfig(BaseConfig):
 
     verbose: bool = False
     """Verbose output, override the base config verbose"""
+
+    robot_scene: Optional[str] = None
+    """Override ROBOT_SCENE: a path relative to the repo root, or an investigation scene name
+    from gear_sonic/investigation/decoder_expressivity/make_scenes.py (e.g. hurdle_10cm)."""
+
+    eval_log_dir: Optional[str] = None
+    """If set, log per-tick root pose / contacts / falls to this directory (eval_log.npz, summary.json)."""
+
+    fall_reset: bool = True
+    """Reset the simulation when the pelvis drops below 0.2 m."""
